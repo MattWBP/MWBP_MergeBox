@@ -1,41 +1,44 @@
 import sys
 # Import the core and GUI elements of Qt
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from PySide2 import QtWidgets
-from PySide2 import QtCore
-from PySide2 import QtGui
+try:
+    import nuke
+    if nuke.NUKE_VERSION_MAJOR < 11:
+        from PySide import QtCore, QtGui, QtGui as QtWidgets
+    else:
+        from PySide2 import QtGui, QtCore, QtWidgets
+except:
+    from PySide2 import QtWidgets
+    from PySide2 import QtCore
+    from PySide2 import QtGui
 
-import queue
+from pprint import pprint
 # import nuke
 
+
 class MergeButton(QtWidgets.QLabel):
-    def __init__(self, parent, operation):
+    merge_selected = QtCore.Signal(str)
+    def __init__(self, operation, ):
         super(MergeButton, self).__init__()
 
-        self.parent = parent
+        # arguments
         self.operation = operation
         self.setText(operation)
+        
+        # variables
+        self.positon = (0,0)
 
-
+        # ui
         self.bgColor = '#525252'
         self.borderColor = '#000000'
         self.borderColor = '#959595'
         self.selectionColor = '#5285a6'
         self.setSelectionStatus(False)
-
-        # set the border color to grey for buttons from an additional repository
-
         self.setAlignment(QtCore.Qt.AlignCenter)
         self.setMouseTracking(True)
         self.setFixedWidth(105)
         self.setFixedHeight(35)
-
+        
     def setSelectionStatus(self, selected = False):
-        '''
-        Define the style of the button for different states
-        '''
-
         #if button becomes selected
         if selected:
             self.setStyleSheet("""
@@ -55,137 +58,136 @@ class MergeButton(QtWidgets.QLabel):
         self.selected = selected
 
     def enterEvent(self, event):
-        '''
-        Change color of the button when the mouse starts hovering over it
-        '''
         self.setSelectionStatus(True)
         return True
 
     def leaveEvent(self,event):
-        '''
-        Change color of the button when the mouse stops hovering over it
-        '''
         self.setSelectionStatus()
         return True
 
+
     def mousePressEvent(self, ev: QtGui.QMouseEvent):
-        self.parent.closeMergeBox()
-        self.invoke()
+        # self.parent().custom_slot(self.operation)
+        self.merge_selected.emit(self.text())
 
-    def command(self):
-        node = nuke.createNode('Merge')
-        node.knob('operation').setValue(self.operation)
-
-    def invoke(self):
-        # self.command()
-        print(self.operation)
-
-#
 
 class MergeBox(QtWidgets.QWidget):
+    # signals
+
     def __init__(self):
         super(MergeBox, self).__init__()
 
-        self.active = True
+        # self.merge_select.connect(self.custom_slot)
 
-        self.setStyleSheet("background-color: rgba(0,0,0,0%)");
-
+        # layout
         self.all_rows = QtWidgets.QVBoxLayout()
         self.setLayout(self.all_rows)
 
+        # style
+        self.setStyleSheet("background-color: rgba(0,0,0,0%)")
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
-
         self.setAttribute(QtCore.Qt.WA_NoSystemBackground)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
+        # variables
+        self.active = True
         self.shortcut = 'm'
 
         # define all the merge operations, if they're visible, if they're favourites.
         self.merge_operations = {
-            'atop': (True, False),
-            'average': (True, False),
-            'color-burn': (True, False),
-            'color-dodge': (True, False),
-            'conjoint-over': (True, False),
-            'copy': (True, False),
-            'difference': (True, False),
-            'disjoint-over': (True, False),
-            'divide': (True, False),
-            'exclusion': (True, False),
-            'from': (True, False),
-            'geometric': (True, False),
-            'hard-light': (True, False),
-            'hypot': (True, False),
-            'in': (True, False),
-            'mask': (True, True),
-            'matte': (True, False),
-            'max': (True, False),
-            'min': (True, False),
-            'minus': (True, False),
-            'multiply': (True, False),
-            'out': (True, False),
-            'over': (True, True),
-            'overlay': (True, False),
-            'plus': (True, False),
-            'screen': (True, False),
-            'soft-light': (True, False),
-            'stencil': (True, True),
-            'under': (True, True),
-            'xor': (True, False)
+            'average':       (1,1),
+
+            'atop':          (2,1),
+            'color-burn':    (2,2),
+
+            'color-dodge':   (3,1),
+            'conjoint-over': (3,2),
+            'copy':          (3,3),
+            'difference':    (3,4),
+
+            'disjoint-over': (4,1),
+            'divide':        (4,2),
+            'exclusion':     (4,3),
+            'from':          (4,4),
+            'geometric':     (4,5),
+
+            'hard-light':    (5,1),
+            'hypot':         (5,2),
+            'in':            (5,3),
+            # center
+            'mask':          (5,4),
+            'matte':         (5,5),
+            'max':           (5,6),
+
+            'min':           (6,1),
+            'minus':         (6,2),
+            'multiply':      (6,3),
+            'out':           (6,4),
+            'over':          (6,5),
+
+            'overlay':       (7,1),
+            'plus':          (7,2),
+            'screen':        (7,3),
+            'soft-light':    (7,4),
+
+            'stencil':       (8,1),
+            'under':         (8,2),
+
+            'xor':           (9,1)
         }
 
-        self.q = queue.Queue()
-        [self.q.put(i) for i in self.merge_operations]
+        self.setup_ui()
 
-        self.setup_layout()
+    def merge_selected_slot(self, operation):
+        self.hide()
+        self.create_node(operation)
+        self.close()
+
+    def create_node(self, operation):
+        # node = nuke.createNode('Merge')
+        # node.knob('operation').setValue(operation)
+        print('creating node:', operation)
+
+    def setup_ui(self):
+        row_count = max(self.merge_operations.values())[0]
+        center_row = (row_count - 1)/2 +1
 
 
-    def add_row(self, count=0):
-        # print('adding', count, 'items')
-        row = QtWidgets.QHBoxLayout()
-        row.setAlignment(QtCore.Qt.AlignCenter)
-        for operation in range(count):
-            operation = self.q.get()
-            # print(operation)
-            # Create a label widget with our text
+        for row in range(1,row_count+1):
+            this_row = row
+            this_row_operations = [k for k,v in self.merge_operations.items() if v[0]==this_row]
+            this_row_operations_ordered = {}
 
-            label = MergeButton(self, operation)
-            row.addWidget(label)
-        self.all_rows.addLayout(row)
+            for row_operation in this_row_operations:
+                operation = row_operation
+                row, position = self.merge_operations[operation]
+                this_row_operations_ordered[position] = row_operation
 
-    def add_centre_row(self, length=4):
-        # print('adding centre row')
-        row = QtWidgets.QHBoxLayout()
-        row.setAlignment(QtCore.Qt.AlignCenter)
-        for operation in range(int(length/2)):
-            operation = self.q.get()
-            label = MergeButton(self, operation)
-            row.addWidget(label)
+            # pprint(this_row_operations_ordered)
 
-        spacer = QtWidgets.QLabel()
-        spacer.setFixedWidth(105)
-        spacer.setFixedHeight(35)
-        spacer.setAlignment(QtCore.Qt.AlignCenter)
-        spacer.setStyleSheet("background-color: rgba(255,0,0,0%)");
-        row.addWidget(spacer)
+            row_layout = QtWidgets.QHBoxLayout()
+            row_layout.setAlignment(QtCore.Qt.AlignCenter)
 
-        for operation in range(int(length/2)):
-            operation = self.q.get()
-            label = MergeButton(self, operation)
-            row.addWidget(label)
+            if this_row == center_row:          
+                center_count = int(len(this_row_operations_ordered)/2)
+            else:
+                center_count = None
 
-        self.all_rows.addLayout(row)
+            for count in this_row_operations_ordered:
+                label = MergeButton(this_row_operations_ordered[count])
+                label.merge_selected.connect(self.merge_selected_slot)
+                row_layout.addWidget(label)
 
-    def setup_layout(self):
-        self.add_row(1)
-        self.add_row(2)
-        self.add_row(4)
-        self.add_row(5)
-        self.add_centre_row(7)
-        self.add_row(5)
-        self.add_row(4)
-        self.add_row(2)
-        self.add_row(1)
+                if center_count:
+                    if count == center_count:
+                        spacer = QtWidgets.QLabel()
+                        spacer.setFixedWidth(105)
+                        spacer.setFixedHeight(35)
+                        spacer.setAlignment(QtCore.Qt.AlignCenter)
+                        spacer.setStyleSheet("background-color: rgba(255,0,0,0%)")
+                        row_layout.addWidget(spacer)
+
+            self.all_rows.addLayout(row_layout)
 
     def showMergeBox(self):
         self.show()
