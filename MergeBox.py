@@ -12,7 +12,7 @@ except:
     from PySide2 import QtGui
 
 from pprint import pprint
-# import nuke
+import nuke
 
 
 class MergeButton(QtWidgets.QLabel):
